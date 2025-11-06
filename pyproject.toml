@@ -1,0 +1,57 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "tilesort"
+description = "A sorting algorithm optimized for datasets with pre-sorted contiguous blocks (tiles)"
+requires-python = ">=3.8"
+authors = [
+    { name = "Evan Williams", email = "evanjpw@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+#readme = "README.md"
+#license = { text = "MIT OR Apache-2.0" }
+#keywords = ["sorting", "algorithm", "optimization", "performance"]
+dynamic = ["version",   "license",   "readme",    "keywords"]
+# TODO: add:
+#dynamic = [
+#    "description",
+#    "urls",
+#    "authors",
+#]
+
+[project.urls]
+Homepage = "https://github.com/evanjpw/tilesort"
+Repository = "https://github.com/evanjpw/tilesort"
+# TODO: Add real documentation
+Documentation = "https://github.com/evanjpw/tilesort#readme"
+
+[tool.maturin]
+features = ["pyo3/extension-module", "python"]
+python-source = "python"
+module-name = "tilesort._tilesort"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.4", "pytest>=7.0", "mypy>=1.0"
+]

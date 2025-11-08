@@ -2,6 +2,7 @@
 name = "tilesort"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.63"
 authors = ["Evan Williams <evanjpw@gmail.com>"]
 description = "A sorting algorithm optimized for datasets with pre-sorted contiguous blocks (tiles)"
 readme = "README.md"

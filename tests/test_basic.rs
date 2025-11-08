@@ -50,7 +50,7 @@ fn test_single_element() {
 fn test_empty() {
     let mut data: Vec<i32> = vec![];
     tilesort(&mut data);
-    assert_eq!(data, vec![]);
+    assert_eq!(data, Vec::<i32>::new());
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn test_tilesorted_three_tiles() {
 fn test_tilesorted_empty() {
     let data: Vec<i32> = vec![];
     let sorted = tilesorted(&data);
-    assert_eq!(sorted, vec![]);
+    assert_eq!(sorted, Vec::<i32>::new());
 }
 
 #[test]

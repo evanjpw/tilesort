@@ -4,6 +4,12 @@
 [![PyPI](https://img.shields.io/pypi/v/tilesort.svg)](https://pypi.org/project/tilesort/)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.rs/tilesort)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
+[![Python Versions](https://img.shields.io/pypi/pyversions/tilesor.svg)](https://pypi.org/project/tilesort/)
+![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fevanjpw%2Ftilesort%2Fmain%2Fpyproject.toml)
+![Crates.io MSRV](https://img.shields.io/crates/msrv/tilesort)
+[![Rust Tests](https://github.com/evanjpw/tilesort/actions/workflows/rust-tests.yml/badge.svg)](https://github.com/evanjpw/tilesort/actions/workflows/rust-tests.yml)
+[![Python Tests](https://github.com/evanjpw/tilesort/actions/workflows/python-tests.yml/badge.svg)](https://github.com/evanjpw/tilesort/actions/workflows/python-tests.yml)
+[![Downloads](https://pepy.tech/badge/tilesort)](https://pepy.tech/project/tilesort)
 
 A sorting algorithm optimized for datasets with pre-sorted contiguous blocks (tiles).
 
@@ -221,8 +227,8 @@ cargo doc --open
 #### Python Package
 
 Requirements:
-- Rust toolchain (1.70+)
-- Python 3.8+
+- Rust toolchain (1.63+)
+- Python 3.8-3.14
 - [uv](https://github.com/astral-sh/uv) (recommended) or maturin
 
 ```bash

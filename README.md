@@ -5,8 +5,8 @@
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://docs.rs/tilesort)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE)
 [![Python Versions](https://img.shields.io/pypi/pyversions/tilesort.svg)](https://pypi.org/project/tilesort/)
-![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fevanjpw%2Ftilesort%2Fmain%2Fpyproject.toml)
-![Crates.io MSRV](https://img.shields.io/crates/msrv/tilesort)
+[![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fevanjpw%2Ftilesort%2Fmain%2Fpyproject.toml)](pyproject.toml)
+[![Crates.io MSRV](https://img.shields.io/crates/msrv/tilesort)](Cargo.toml)
 [![Rust Tests](https://github.com/evanjpw/tilesort/actions/workflows/rust-tests.yml/badge.svg)](https://github.com/evanjpw/tilesort/actions/workflows/rust-tests.yml)
 [![Python Tests](https://github.com/evanjpw/tilesort/actions/workflows/python-tests.yml/badge.svg)](https://github.com/evanjpw/tilesort/actions/workflows/python-tests.yml)
 [![Downloads](https://pepy.tech/badge/tilesort)](https://pepy.tech/project/tilesort)
@@ -28,6 +28,19 @@ Tilesort is particularly effective when:
 - Merging sorted log files or event streams
 - Processing time-series data with sorted segments
 - You have *k* tiles in a dataset of *n* elements where *k* << *n*
+
+### When NOT to Use Tilesort
+
+**Do not use tilesort if:**
+- **Your data is randomly shuffled** - Tilesort has O(n²) worst-case complexity when there are no pre-sorted tiles.
+  Use standard sort algorithms instead.
+- **You don't know if your data has tiles** - If your data doesn't have pre-sorted regions, tilesort will be
+  significantly slower than standard sorting.
+- **The number of tiles approaches the number of elements (k ≈ n)** - The overhead of tile detection and management
+  provides no benefit when most elements are in their own tile.
+
+Tilesort is a specialized algorithm for a specific data pattern. If you're unsure whether your data has pre-sorted
+tiles, use a standard sorting algorithm.
 
 ### Performance
 
@@ -56,7 +69,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tilesort = "0.1"
+tilesort = "0.1.0"
 ```
 
 ## Usage
@@ -138,7 +151,7 @@ fn main() {
     println!("{:?}", words);  // ["a", "cat", "dog", "bear", "elephant"]
 
     // Sort custom structs
-    #[derive(Debug, Clone)]
+    #[derive(Clone)]
     struct Person {
         name: String,
         age: u32,
@@ -227,7 +240,7 @@ cargo doc --open
 #### Python Package
 
 Requirements:
-- Rust toolchain (1.63+)
+- Rust toolchain (1.71.1+)
 - Python 3.8-3.14
 - [uv](https://github.com/astral-sh/uv) (recommended) or maturin
 

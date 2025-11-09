@@ -71,17 +71,13 @@ impl Tile {
 /// This is a newtype wrapper around Vec<Tile> to allow easy replacement
 /// with a different data structure if needed.
 #[derive(Debug)]
-pub struct TileIndex<K> {
+pub struct TileIndex {
     tiles: Vec<Tile>,
-    _phantom: std::marker::PhantomData<K>,
 }
 
-impl<K: Ord + std::fmt::Debug> TileIndex<K> {
+impl TileIndex {
     pub(crate) fn new() -> Self {
-        TileIndex {
-            tiles: Vec::new(),
-            _phantom: std::marker::PhantomData,
-        }
+        TileIndex { tiles: Vec::new() }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -109,7 +105,7 @@ impl<K: Ord + std::fmt::Debug> TileIndex<K> {
     }
 
     /// Insert a new tile into the tile index, potentially splitting the new tile if it spans multiple positions.
-    pub fn insert_tile(&mut self, new_tile: Tile, element_keys: &[K], reverse: bool) {
+    pub fn insert_tile<K: Ord>(&mut self, new_tile: Tile, element_keys: &[K], reverse: bool) {
         // If this is the first tile, just add it
         if self.is_empty() {
             self.push(new_tile);
@@ -179,7 +175,7 @@ impl<K: Ord + std::fmt::Debug> TileIndex<K> {
     }
 
     /// Split the new tile at the boundary and recursively insert pieces.
-    fn split_new_tile_and_insert(
+    fn split_new_tile_and_insert<K: Ord>(
         &mut self,
         new_tile: Tile,
         element_keys: &[K],
@@ -192,10 +188,9 @@ impl<K: Ord + std::fmt::Debug> TileIndex<K> {
         let split_key = overlapping_tile.tile_key(element_keys);
 
         debug!(
-            "Splitting new tile at start={}, count={} at split_key={:?}",
+            "Splitting new tile at start={}, count={}",
             new_tile.start_idx(),
-            new_tile.len(),
-            split_key
+            new_tile.len()
         );
 
         // Find where in the new tile we should split
@@ -241,7 +236,7 @@ impl<K: Ord + std::fmt::Debug> TileIndex<K> {
     }
 
     /// Split an existing tile and insert the new tile between the pieces.
-    fn split_existing_and_insert(
+    fn split_existing_and_insert<K: Ord>(
         &mut self,
         tile_idx: usize,
         new_tile: Tile,

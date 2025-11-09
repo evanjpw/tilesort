@@ -69,7 +69,6 @@ where
             };
 
             if finish_tile {
-                // TODO: Is this correct, or is it off by 1?
                 let count = idx - start_idx;
                 let new_tile = Tile::new(start_idx, count);
                 tile_index.insert_tile(new_tile, &element_keys, reverse);
@@ -86,7 +85,6 @@ where
     let start_idx =
         tile_start_idx.expect("There should be at least one tile index before the end of the data");
     let elements_count = element_keys.len();
-    // TODO: Is this correct, or is it off by 1?
     let count = elements_count - start_idx;
     let new_tile = Tile::new(start_idx, count);
     tile_index.insert_tile(new_tile, &element_keys, reverse);

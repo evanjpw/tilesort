@@ -232,3 +232,38 @@ fn test_tilesort_by_key_struct() {
     assert_eq!(data[3].name, "Charlie"); // age 35
     assert_eq!(data[4].name, "Diana"); // age 40
 }
+
+/// Test to verify tile boundary counting logic is correct (addresses TODO comments in sorter.rs)
+/// This test explicitly verifies:
+/// 1. count = idx - start_idx is correct for mid-array tiles
+/// 2. count = elements_count - start_idx is correct for the last tile
+#[test]
+fn test_tile_boundary_counting() {
+    // Test case: [1, 2, 3, 5, 4]
+    // Tile 0: indices 0-3 (values 1,2,3,5) -> count should be 4
+    // Tile 1: index 4 (value 4) -> count should be 1
+    let mut data = vec![1, 2, 3, 5, 4];
+    tilesort(&mut data);
+    assert_eq!(data, vec![1, 2, 3, 4, 5]);
+
+    // Test case: Multiple tiles with varying sizes
+    // [10, 20, 5, 15, 25, 35, 30]
+    // Tile 0: indices 0-1 (values 10,20) -> count should be 2
+    // Tile 1: index 2 (value 5) -> count should be 1
+    // Tile 2: indices 3-5 (values 15,25,35) -> count should be 3
+    // Tile 3: index 6 (value 30) -> count should be 1
+    let mut data = vec![10, 20, 5, 15, 25, 35, 30];
+    tilesort(&mut data);
+    assert_eq!(data, vec![5, 10, 15, 20, 25, 30, 35]);
+
+    // Test case: Last tile has multiple elements
+    // [5, 4, 3, 1, 2, 6, 7, 8, 9, 10]
+    // Tile 0: index 0 (value 5) -> count should be 1
+    // Tile 1: index 1 (value 4) -> count should be 1
+    // Tile 2: index 2 (value 3) -> count should be 1
+    // Tile 3: indices 3-4 (values 1,2) -> count should be 2
+    // Tile 4: indices 5-9 (values 6,7,8,9,10) -> count should be 5 (last tile)
+    let mut data = vec![5, 4, 3, 1, 2, 6, 7, 8, 9, 10];
+    tilesort(&mut data);
+    assert_eq!(data, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+}

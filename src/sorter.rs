@@ -69,11 +69,9 @@ where
             };
 
             if finish_tile {
-                let start_key = element_keys[start_idx].clone();
-                let end_key = prev_key;
                 // TODO: Is this correct, or is it off by 1?
                 let count = idx - start_idx;
-                let new_tile = Tile::new(start_idx, count, start_key, end_key.clone());
+                let new_tile = Tile::new(start_idx, count);
                 tile_index.insert_tile(new_tile, &element_keys, reverse);
                 tile_start_idx = None;
             }
@@ -87,12 +85,10 @@ where
     // Add the last tile
     let start_idx =
         tile_start_idx.expect("There should be at least one tile index before the end of the data");
-    let start_key = element_keys[start_idx].clone();
     let elements_count = element_keys.len();
-    let end_key = element_keys[elements_count - 1].clone();
     // TODO: Is this correct, or is it off by 1?
     let count = elements_count - start_idx;
-    let new_tile = Tile::new(start_idx, count, start_key, end_key.clone());
+    let new_tile = Tile::new(start_idx, count);
     tile_index.insert_tile(new_tile, &element_keys, reverse);
 
     tile_index

@@ -41,6 +41,10 @@ build:
 build-release:
     maturin build --release --features python
 
+# Run benchmarks
+bench:
+    cargo bench
+
 # Run all checks (tests + typecheck + lint)
 check: test typecheck lint
 

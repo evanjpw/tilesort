@@ -2,25 +2,16 @@ use log::debug;
 
 /// Represents a contiguous sorted block (tile) in the input data.
 #[derive(Debug, Clone)]
-pub struct Tile<K> {
+pub struct Tile {
     /// Starting index in the original array
     start_index: usize,
     /// Number of elements in this tile
     count: usize,
-    /// Key of the first element (the "tile key")
-    tile_key: K,
-    /// Key of the last element (for range checking)
-    end_key: K,
 }
 
-impl<K: Ord + Clone> Tile<K> {
-    pub(crate) fn new(start_index: usize, count: usize, tile_key: K, end_key: K) -> Self {
-        Tile {
-            start_index,
-            count,
-            tile_key,
-            end_key,
-        }
+impl Tile {
+    pub(crate) fn new(start_index: usize, count: usize) -> Self {
+        Tile { start_index, count }
     }
 
     pub(crate) fn start_idx(&self) -> usize {
@@ -40,8 +31,18 @@ impl<K: Ord + Clone> Tile<K> {
         self.count
     }
 
+    /// Get the key of the first element (the "tile key")
+    pub(crate) fn tile_key<'a, K>(&self, element_keys: &'a [K]) -> &'a K {
+        &element_keys[self.start_index]
+    }
+
+    /// Get the key of the last element (for range checking)
+    pub(crate) fn end_key<'a, K>(&self, element_keys: &'a [K]) -> &'a K {
+        &element_keys[self.start_index + self.count - 1]
+    }
+
     /// Binary search to find the split point in a tile.
-    pub(crate) fn find_split_point(
+    pub(crate) fn find_split_point<K: Ord>(
         &self,
         element_keys: &[K],
         split_key: &K,
@@ -71,12 +72,16 @@ impl<K: Ord + Clone> Tile<K> {
 /// with a different data structure if needed.
 #[derive(Debug)]
 pub struct TileIndex<K> {
-    tiles: Vec<Tile<K>>,
+    tiles: Vec<Tile>,
+    _phantom: std::marker::PhantomData<K>,
 }
 
-impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
+impl<K: Ord + std::fmt::Debug> TileIndex<K> {
     pub(crate) fn new() -> Self {
-        TileIndex { tiles: Vec::new() }
+        TileIndex {
+            tiles: Vec::new(),
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -87,24 +92,24 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
         self.tiles.is_empty()
     }
 
-    fn get(&self, index: usize) -> Option<&Tile<K>> {
+    fn get(&self, index: usize) -> Option<&Tile> {
         self.tiles.get(index)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &Tile<K>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &Tile> {
         self.tiles.iter()
     }
 
-    fn insert(&mut self, index: usize, tile: Tile<K>) {
+    fn insert(&mut self, index: usize, tile: Tile) {
         self.tiles.insert(index, tile);
     }
 
-    fn push(&mut self, tile: Tile<K>) {
+    fn push(&mut self, tile: Tile) {
         self.tiles.push(tile);
     }
 
     /// Insert a new tile into the tile index, potentially splitting the new tile if it spans multiple positions.
-    pub fn insert_tile(&mut self, new_tile: Tile<K>, element_keys: &[K], reverse: bool) {
+    pub fn insert_tile(&mut self, new_tile: Tile, element_keys: &[K], reverse: bool) {
         // If this is the first tile, just add it
         if self.is_empty() {
             self.push(new_tile);
@@ -119,9 +124,9 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
             let current = self.get(i).unwrap();
 
             let should_insert_before = if reverse {
-                new_tile.tile_key > current.tile_key
+                new_tile.tile_key(element_keys) > current.tile_key(element_keys)
             } else {
-                new_tile.tile_key < current.tile_key
+                new_tile.tile_key(element_keys) < current.tile_key(element_keys)
             };
 
             if should_insert_before {
@@ -132,9 +137,11 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
             // Check if the new tile falls within this existing tile's range
             // This means we need to split the EXISTING tile
             let new_within_existing = if reverse {
-                new_tile.tile_key < current.tile_key && new_tile.tile_key > current.end_key
+                new_tile.tile_key(element_keys) < current.tile_key(element_keys)
+                    && new_tile.tile_key(element_keys) > current.end_key(element_keys)
             } else {
-                new_tile.tile_key > current.tile_key && new_tile.tile_key < current.end_key
+                new_tile.tile_key(element_keys) > current.tile_key(element_keys)
+                    && new_tile.tile_key(element_keys) < current.end_key(element_keys)
             };
 
             if new_within_existing {
@@ -154,9 +161,9 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
 
             // Check if the new tile's end_key extends past this existing tile's start
             let overlaps = if reverse {
-                new_tile.end_key < existing.tile_key
+                new_tile.end_key(element_keys) < existing.tile_key(element_keys)
             } else {
-                new_tile.end_key > existing.tile_key
+                new_tile.end_key(element_keys) > existing.tile_key(element_keys)
             };
 
             if overlaps {
@@ -174,7 +181,7 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
     /// Split the new tile at the boundary and recursively insert pieces.
     fn split_new_tile_and_insert(
         &mut self,
-        new_tile: Tile<K>,
+        new_tile: Tile,
         element_keys: &[K],
         insert_position: usize,
         overlapping_tile_index: usize,
@@ -182,11 +189,13 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
     ) {
         // Find the split point - where does the overlapping tile's range begin?
         let overlapping_tile = self.get(overlapping_tile_index).unwrap();
-        let split_key = &overlapping_tile.tile_key;
+        let split_key = overlapping_tile.tile_key(element_keys);
 
         debug!(
             "Splitting new tile at start={}, count={} at split_key={:?}",
-            new_tile.start_index, new_tile.count, split_key
+            new_tile.start_idx(),
+            new_tile.len(),
+            split_key
         );
 
         // Find where in the new tile we should split
@@ -195,7 +204,7 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
         debug!("Split point: {}", split_point);
 
         // Create the two pieces
-        if split_point == new_tile.start_index {
+        if split_point == new_tile.start_idx() {
             // Split point is at the start - shouldn't happen, but handle gracefully
             debug!("Split point at start, inserting whole tile");
             self.insert(insert_position, new_tile);
@@ -209,26 +218,19 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
             return;
         }
 
-        let first_piece = Tile {
-            start_index: new_tile.start_index,
-            count: split_point - new_tile.start_index,
-            tile_key: new_tile.tile_key.clone(),
-            end_key: element_keys[split_point - 1].clone(),
-        };
+        let first_piece = Tile::new(new_tile.start_idx(), split_point - new_tile.start_idx());
 
-        let second_piece = Tile {
-            start_index: split_point,
-            count: (new_tile.start_index + new_tile.count) - split_point,
-            tile_key: element_keys[split_point].clone(),
-            end_key: new_tile.end_key.clone(),
-        };
+        let second_piece = Tile::new(
+            split_point,
+            (new_tile.start_idx() + new_tile.len()) - split_point,
+        );
 
         debug!(
             "Split into: piece1(start={}, count={}), piece2(start={}, count={})",
-            first_piece.start_index,
-            first_piece.count,
-            second_piece.start_index,
-            second_piece.count
+            first_piece.start_idx(),
+            first_piece.len(),
+            second_piece.start_idx(),
+            second_piece.len()
         );
 
         // Insert the first piece at the current position
@@ -242,7 +244,7 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
     fn split_existing_and_insert(
         &mut self,
         tile_idx: usize,
-        new_tile: Tile<K>,
+        new_tile: Tile,
         element_keys: &[K],
         reverse: bool,
     ) {
@@ -255,7 +257,8 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
         );
 
         // Find where to split the existing tile (at the new tile's start key)
-        let split_point = original_tile.find_split_point(element_keys, &new_tile.tile_key, reverse);
+        let split_point =
+            original_tile.find_split_point(element_keys, new_tile.tile_key(element_keys), reverse);
 
         debug!("Split point: {}", split_point);
 
@@ -266,19 +269,15 @@ impl<K: Ord + Clone + std::fmt::Debug> TileIndex<K> {
         }
 
         // Create the two pieces of the existing tile
-        let first_piece = Tile {
-            start_index: original_tile.start_index,
-            count: split_point - original_tile.start_index,
-            tile_key: original_tile.tile_key.clone(),
-            end_key: element_keys[split_point - 1].clone(),
-        };
+        let first_piece = Tile::new(
+            original_tile.start_index,
+            split_point - original_tile.start_index,
+        );
 
-        let second_piece = Tile {
-            start_index: split_point,
-            count: (original_tile.start_index + original_tile.count) - split_point,
-            tile_key: element_keys[split_point].clone(),
-            end_key: original_tile.end_key.clone(),
-        };
+        let second_piece = Tile::new(
+            split_point,
+            (original_tile.start_index + original_tile.count) - split_point,
+        );
 
         // Remove the original tile
         self.tiles.remove(tile_idx);

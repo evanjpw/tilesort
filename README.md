@@ -269,9 +269,37 @@ just typecheck    # Run mypy type checking
 just lint         # Run ruff linter
 just format       # Format code with ruff
 just build        # Build Python package
+just bench        # Run benchmarks
 just check        # Run all checks (test + typecheck + lint)
 just clean        # Clean build artifacts
 ```
+
+### Benchmarks
+
+Performance benchmarks compare tilesort against Rust's standard sort across different scenarios:
+
+```bash
+# Run all benchmarks
+cargo bench
+
+# Run specific benchmark group
+cargo bench uniform_tiles
+cargo bench varied_tiles
+cargo bench hybrid_tiles
+cargo bench random_data
+cargo bench key_function
+cargo bench realistic_workload
+```
+
+**Benchmark scenarios:**
+- **uniform_tiles**: All tiles have the same size (~1K elements)
+- **varied_tiles**: Tiles of different sizes (100, 1K, 5K, 10K)
+- **hybrid_tiles**: Mix of single elements and large blocks
+- **random_data**: Completely random (worst case for tilesort)
+- **key_function**: Structured data requiring key extraction
+- **realistic_workload**: 1M elements with ~10K element tiles (mirrors real-world usage)
+
+Results are saved to `target/criterion/` with HTML reports.
 
 ## License
 

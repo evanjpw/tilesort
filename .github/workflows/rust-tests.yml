@@ -50,15 +50,15 @@ jobs:
         RUSTDOCFLAGS: -D warnings
 
   msrv:
-    name: Check MSRV (Rust 1.63)
+    name: Check MSRV
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Rust 1.63
+    - name: Set up Rust 1.71.1
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
-        toolchain: "1.63"
+        toolchain: "1.71.1"
 
     - name: Check with MSRV
       run: cargo check --all-features

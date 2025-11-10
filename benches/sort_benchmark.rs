@@ -13,7 +13,7 @@ fn generate_tiled_data(total_size: usize, tile_sizes: &[usize]) -> Vec<i32> {
         let tile_size = tile_sizes[tile_idx % tile_sizes.len()].min(remaining);
 
         // Generate a sorted tile with random starting value
-        let start: i32 = rng.gen_range(0..1_000_000);
+        let start: i32 = rng.random_range(0..1_000_000);
         let mut tile: Vec<i32> = (0..tile_size).map(|i| start + i as i32).collect();
 
         result.append(&mut tile);
@@ -40,7 +40,7 @@ fn generate_tiled_data(total_size: usize, tile_sizes: &[usize]) -> Vec<i32> {
 /// Generate completely random data (worst case for tilesort)
 fn generate_random_data(size: usize) -> Vec<i32> {
     let mut rng = StdRng::seed_from_u64(42);
-    (0..size).map(|_| rng.gen()).collect()
+    (0..size).map(|_| rng.random()).collect()
 }
 
 /// Structured data for key function benchmarks
@@ -63,11 +63,11 @@ fn generate_tiled_logs(total_size: usize, tile_sizes: &[usize]) -> Vec<LogEntry>
         let tile_size = tile_sizes[tile_idx % tile_sizes.len()].min(remaining);
 
         // Generate a sorted tile by timestamp
-        let start_ts: u64 = rng.gen_range(0..1_000_000_000);
+        let start_ts: u64 = rng.random_range(0..1_000_000_000);
         for i in 0..tile_size {
             result.push(LogEntry {
                 timestamp: start_ts + (i as u64 * 1000),
-                severity: rng.gen_range(0..5),
+                severity: rng.random_range(0..5),
                 message: format!("Log message {}", i),
             });
         }

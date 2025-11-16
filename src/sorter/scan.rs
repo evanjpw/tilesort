@@ -1,48 +1,5 @@
-//! Core tilesort algorithm implementation.
-
-use crate::key_extractor::KeyExtractor;
 use crate::tile_index::{Tile, TileIndex};
-use log::{debug, info};
-
-/// Main tilesort implementation with custom key extraction.
-///
-/// # Arguments
-/// * `data` - The slice to sort
-/// * `key_extractor` - Extracts sort keys from elements
-/// * `reverse` - If true, sort in descending order; if false, ascending
-pub(crate) fn tilesort_impl_with_key<T, K, E>(data: &mut [T], key_extractor: E, reverse: bool)
-where
-    T: Clone,
-    K: Ord,
-    E: KeyExtractor<T, K>,
-{
-    if data.len() <= 1 {
-        return;
-    }
-
-    // Phase 1: Scan and build tile index
-    let tile_index = scan_phase(data, key_extractor, reverse);
-
-    // Phase 2: Restructure using the tile index
-    restructure_phase(data, &tile_index);
-}
-
-/// Main tilesort implementation (no custom key function).
-///
-/// # Arguments
-/// * `data` - The slice to sort
-/// * `reverse` - If true, sort in descending order; if false, ascending
-pub(crate) fn tilesort_impl<T: Ord + Clone>(data: &mut [T], reverse: bool) {
-    if data.len() <= 1 {
-        return;
-    }
-
-    // Phase 1: Scan and build tile index
-    let tile_index = scan_phase_without_key(data, reverse);
-
-    // Phase 2: Restructure using the tile index
-    restructure_phase(data, &tile_index);
-}
+use crate::KeyExtractor;
 
 fn process_tile_boundaries<K: Ord>(
     tile_index: &mut TileIndex,
@@ -96,7 +53,7 @@ fn add_last_tile<K: Ord>(
 }
 
 /// Phase 1: Scan through the data and build the tile index.
-fn scan_phase<T, K, E>(data: &[T], key_extractor: E, reverse: bool) -> TileIndex
+pub fn scan_phase<T, K, E>(data: &[T], key_extractor: E, reverse: bool) -> TileIndex
 where
     K: Ord,
     E: KeyExtractor<T, K>,
@@ -124,7 +81,7 @@ where
     tile_index
 }
 
-fn scan_phase_without_key<T>(data: &[T], reverse: bool) -> TileIndex
+pub fn scan_phase_without_key<T>(data: &[T], reverse: bool) -> TileIndex
 where
     T: Ord,
 {
@@ -139,33 +96,4 @@ where
     add_last_tile(&mut tile_index, &tile_start_idx, data, reverse);
 
     tile_index
-}
-
-/// Phase 2: Use the tile index to reconstruct the sorted array.
-fn restructure_phase<T>(data: &mut [T], tile_index: &TileIndex)
-where
-    T: Clone,
-{
-    info!("Restructuring with {} tiles", tile_index.len());
-
-    // Create a copy of the original data
-    let original = data.to_vec();
-
-    // Copy tiles in sorted order
-    let mut write_pos = 0;
-    for (i, tile) in tile_index.iter().enumerate() {
-        let start = tile.start_idx();
-        let end = start + tile.len();
-
-        debug!(
-            "Tile {}: start={}, count={}, copying to position {}",
-            i,
-            start,
-            tile.len(),
-            write_pos
-        );
-
-        data[write_pos..write_pos + tile.len()].clone_from_slice(&original[start..end]);
-        write_pos += tile.len();
-    }
 }

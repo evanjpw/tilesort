@@ -1,5 +1,17 @@
 use log::debug;
 
+/// Statistics about tile size distribution (precomputed during scan phase)
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+pub struct TileStats {
+    pub num_tiles: usize,
+    pub min_size: usize,
+    pub max_size: usize,
+    pub median_size: usize,
+    pub avg_size: usize,
+    pub total_elements: usize,
+}
+
 /// Represents a contiguous sorted block (tile) in the input data.
 #[derive(Debug, Clone)]
 pub struct Tile {
@@ -70,14 +82,30 @@ impl Tile {
 ///
 /// This is a newtype wrapper around Vec<Tile> to allow easy replacement
 /// with a different data structure if needed.
+///
+/// Tracks tile size statistics during construction for zero-cost heuristic decisions.
 #[derive(Debug)]
 pub struct TileIndex {
     tiles: Vec<Tile>,
+    /// Minimum tile size (updated as tiles are added)
+    min_tile_size: usize,
+    /// Maximum tile size (updated as tiles are added)
+    max_tile_size: usize,
+    /// Total elements across all tiles
+    total_elements: usize,
+    /// Median tile size (computed once at finalization via counting sort)
+    median_tile_size: Option<usize>,
 }
 
 impl TileIndex {
     pub(crate) fn new() -> Self {
-        TileIndex { tiles: Vec::new() }
+        TileIndex {
+            tiles: Vec::new(),
+            min_tile_size: usize::MAX,
+            max_tile_size: 0,
+            total_elements: 0,
+            median_tile_size: None,
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -97,15 +125,115 @@ impl TileIndex {
     }
 
     fn insert(&mut self, index: usize, tile: Tile) {
+        let tile_len = tile.len();
+        self.min_tile_size = self.min_tile_size.min(tile_len);
+        self.max_tile_size = self.max_tile_size.max(tile_len);
+        self.total_elements += tile_len;
         self.tiles.insert(index, tile);
     }
 
+    fn remove(&mut self, index: usize) -> Tile {
+        let tile = self.tiles.remove(index);
+        self.total_elements -= tile.len();
+        // Note: min/max are not adjusted as recomputing would be expensive
+        // They remain conservative upper/lower bounds
+        tile
+    }
+
     fn push(&mut self, tile: Tile) {
+        let tile_len = tile.len();
+        self.min_tile_size = self.min_tile_size.min(tile_len);
+        self.max_tile_size = self.max_tile_size.max(tile_len);
+        self.total_elements += tile_len;
         self.tiles.push(tile);
     }
 
+    // TODO: We could optimize further by only checking if median is above/below specific
+    //  thresholds (750, 100) rather than computing the exact median. This would be O(num_tiles)
+    //  time with O(1) space by counting tiles >= threshold vs < threshold. Since current
+    //  overhead is ~1µs, this optimization is deferred.
+    /// Compute median tile size using counting sort approach.
+    /// Called once after all tiles have been added.
+    ///
+    /// Optimized to avoid allocation for small tile counts or when tiles are large.
+    ///
+    pub(crate) fn finalize_statistics(&mut self) {
+        if self.tiles.is_empty() {
+            return;
+        }
+
+        let num_tiles = self.tiles.len();
+
+        // For small numbers of tiles, just collect and use nth_element (no full sort needed)
+        // This avoids allocating large counting arrays when tiles are big
+        if num_tiles <= 100 || self.max_tile_size > 10000 {
+            let mut sizes: Vec<usize> = self.tiles.iter().map(|t| t.len()).collect();
+            let median_idx = sizes.len() / 2;
+
+            // Use select_nth_unstable to find median in O(n) average time, no allocation beyond sizes vec
+            let (_, median, _) = sizes.select_nth_unstable(median_idx);
+            self.median_tile_size = Some(*median);
+            return;
+        }
+
+        // For many small-ish tiles, use counting sort (O(max_tile_size) space)
+        let mut size_counts = vec![0usize; self.max_tile_size + 1];
+
+        for tile in &self.tiles {
+            size_counts[tile.len()] += 1;
+        }
+
+        // Find median by walking through counts
+        let median_pos = num_tiles / 2;
+        let mut cumulative = 0;
+
+        for (size, &count) in size_counts.iter().enumerate() {
+            cumulative += count;
+            if cumulative > median_pos {
+                self.median_tile_size = Some(size);
+                break;
+            }
+        }
+    }
+
+    /// Get tile size statistics (for heuristic decisions)
+    pub(crate) fn stats(&self) -> TileStats {
+        TileStats {
+            num_tiles: self.tiles.len(),
+            min_size: if self.tiles.is_empty() {
+                0
+            } else {
+                self.min_tile_size
+            },
+            max_size: self.max_tile_size,
+            median_size: self.median_tile_size.unwrap_or(0),
+            avg_size: if self.tiles.is_empty() {
+                0
+            } else {
+                self.total_elements / self.tiles.len()
+            },
+            total_elements: self.total_elements,
+        }
+    }
+
     /// Insert a new tile into the tile index, potentially splitting the new tile if it spans multiple positions.
+    /// Uses iterative approach with work queue to avoid stack overflow on deep recursion.
     pub fn insert_tile<K: Ord>(&mut self, new_tile: Tile, element_keys: &[K], reverse: bool) {
+        let mut work_queue = vec![new_tile];
+
+        while let Some(tile_to_insert) = work_queue.pop() {
+            self.insert_tile_single(&mut work_queue, tile_to_insert, element_keys, reverse);
+        }
+    }
+
+    /// Insert a single tile, potentially adding more tiles to the work queue if splitting is needed.
+    fn insert_tile_single<K: Ord>(
+        &mut self,
+        work_queue: &mut Vec<Tile>,
+        new_tile: Tile,
+        element_keys: &[K],
+        reverse: bool,
+    ) {
         // If this is the first tile, just add it
         if self.is_empty() {
             self.push(new_tile);
@@ -133,19 +261,27 @@ impl TileIndex {
             // Check if the new tile falls within this existing tile's range
             // This means we need to split the EXISTING tile
             let new_within_existing = if reverse {
-                new_tile.tile_key(element_keys) < current.tile_key(element_keys)
-                    && new_tile.tile_key(element_keys) > current.end_key(element_keys)
+                new_tile.tile_key(element_keys) <= current.tile_key(element_keys)
+                    && new_tile.tile_key(element_keys) >= current.end_key(element_keys)
             } else {
-                new_tile.tile_key(element_keys) > current.tile_key(element_keys)
-                    && new_tile.tile_key(element_keys) < current.end_key(element_keys)
+                new_tile.tile_key(element_keys) >= current.tile_key(element_keys)
+                    && new_tile.tile_key(element_keys) <= current.end_key(element_keys)
             };
 
             if new_within_existing {
+                // Don't split single-element tiles - just continue to find the right position
+                if current.len() == 1 {
+                    debug!(
+                        "New tile matches single-element tile at position {}, continuing",
+                        i
+                    );
+                    continue;
+                }
                 debug!(
                     "New tile falls within existing tile at position {}, splitting existing",
                     i
                 );
-                self.split_existing_and_insert(i, new_tile, element_keys, reverse);
+                self.split_existing_and_insert(work_queue, i, new_tile, element_keys, reverse);
                 return;
             }
         }
@@ -157,15 +293,22 @@ impl TileIndex {
 
             // Check if the new tile's end_key extends past this existing tile's start
             let overlaps = if reverse {
-                new_tile.end_key(element_keys) < existing.tile_key(element_keys)
+                new_tile.end_key(element_keys) <= existing.tile_key(element_keys)
             } else {
-                new_tile.end_key(element_keys) > existing.tile_key(element_keys)
+                new_tile.end_key(element_keys) >= existing.tile_key(element_keys)
             };
 
             if overlaps {
                 // The new tile spans multiple positions - we need to split it
                 debug!("New tile spans multiple positions, splitting new tile");
-                self.split_new_tile_and_insert(new_tile, element_keys, insert_position, i, reverse);
+                self.split_new_tile_and_insert(
+                    work_queue,
+                    new_tile,
+                    element_keys,
+                    insert_position,
+                    i,
+                    reverse,
+                );
                 return;
             }
         }
@@ -174,9 +317,10 @@ impl TileIndex {
         self.insert(insert_position, new_tile);
     }
 
-    /// Split the new tile at the boundary and recursively insert pieces.
+    /// Split the new tile at the boundary and add pieces to work queue.
     fn split_new_tile_and_insert<K: Ord>(
         &mut self,
+        work_queue: &mut Vec<Tile>,
         new_tile: Tile,
         element_keys: &[K],
         insert_position: usize,
@@ -231,13 +375,14 @@ impl TileIndex {
         // Insert the first piece at the current position
         self.insert(insert_position, first_piece);
 
-        // Recursively insert the second piece
-        self.insert_tile(second_piece, element_keys, reverse);
+        // Add the second piece to work queue for later insertion
+        work_queue.push(second_piece);
     }
 
-    /// Split an existing tile and insert the new tile between the pieces.
+    /// Split an existing tile and add pieces to work queue.
     fn split_existing_and_insert<K: Ord>(
         &mut self,
+        work_queue: &mut Vec<Tile>,
         tile_idx: usize,
         new_tile: Tile,
         element_keys: &[K],
@@ -257,33 +402,37 @@ impl TileIndex {
 
         debug!("Split point: {}", split_point);
 
-        if split_point == original_tile.start_index || split_point >= original_tile.end_idx() {
-            // Shouldn't happen, but handle gracefully
-            debug!("Invalid split point, inserting without splitting");
+        if split_point >= original_tile.end_idx() {
+            // Split point is beyond the end - shouldn't happen
+            debug!("Invalid split point (beyond end), inserting without splitting");
             return;
         }
 
+        // Handle the case where split point equals start (both tiles start with same value)
+        // In this case, split off a single element from the front
+        let first_piece_size = if split_point == original_tile.start_index {
+            debug!("Split point at start, splitting off single element");
+            1
+        } else {
+            split_point - original_tile.start_index
+        };
+
         // Create the two pieces of the existing tile
-        let first_piece = Tile::new(
-            original_tile.start_index,
-            split_point - original_tile.start_index,
-        );
+        let first_piece = Tile::new(original_tile.start_index, first_piece_size);
 
         let second_piece = Tile::new(
-            split_point,
-            (original_tile.start_index + original_tile.count) - split_point,
+            original_tile.start_index + first_piece_size,
+            original_tile.count - first_piece_size,
         );
 
-        // Remove the original tile
-        self.tiles.remove(tile_idx);
+        // Remove the original tile (adjusts statistics)
+        self.remove(tile_idx);
 
         // Insert the first piece at the original position
         self.insert(tile_idx, first_piece);
 
-        // Recursively insert the new tile (might need further splitting)
-        self.insert_tile(new_tile, element_keys, reverse);
-
-        // Recursively insert the second piece
-        self.insert_tile(second_piece, element_keys, reverse);
+        // Add tiles to work queue for later insertion (order matters: second piece first, then new tile)
+        work_queue.push(second_piece);
+        work_queue.push(new_tile);
     }
 }

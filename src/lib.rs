@@ -24,7 +24,7 @@ pub use key_extractor::{IdentityKey, KeyExtractor};
 /// assert_eq!(data, vec![1, 2, 3, 4, 5, 6, 7, 8]);
 /// ```
 pub fn tilesort<T: Ord + Clone>(data: &mut [T]) {
-    sorter::tilesort_impl(data, false);
+    sorter::tilesort_impl_inplace(data, false);
 }
 
 /// Sort a slice in descending order using the tilesort algorithm.
@@ -37,7 +37,7 @@ pub fn tilesort<T: Ord + Clone>(data: &mut [T]) {
 /// assert_eq!(data, vec![8, 7, 6, 5, 4, 3, 2, 1]);
 /// ```
 pub fn tilesort_reverse<T: Ord + Clone>(data: &mut [T]) {
-    sorter::tilesort_impl(data, true);
+    sorter::tilesort_impl_inplace(data, true);
 }
 
 /// Return a sorted copy of a slice using the tilesort algorithm.
@@ -53,9 +53,7 @@ pub fn tilesort_reverse<T: Ord + Clone>(data: &mut [T]) {
 /// assert_eq!(data, vec![3, 4, 5, 1, 2, 6, 7, 8]); // Original unchanged
 /// ```
 pub fn tilesorted<T: Ord + Clone>(data: &[T]) -> Vec<T> {
-    let mut result = data.to_vec();
-    sorter::tilesort_impl(&mut result, false);
-    result
+    sorter::tilesort_copy(data, false)
 }
 
 /// Return a sorted copy of a slice in descending order using the tilesort algorithm.
@@ -71,9 +69,7 @@ pub fn tilesorted<T: Ord + Clone>(data: &[T]) -> Vec<T> {
 /// assert_eq!(data, vec![3, 4, 5, 1, 2, 6, 7, 8]); // Original unchanged
 /// ```
 pub fn tilesorted_reverse<T: Ord + Clone>(data: &[T]) -> Vec<T> {
-    let mut result = data.to_vec();
-    sorter::tilesort_impl(&mut result, true);
-    result
+    sorter::tilesort_copy(data, true)
 }
 
 /// Sort a slice using a custom key extraction function.
@@ -91,7 +87,7 @@ where
     K: Ord + Clone,
     F: Fn(&T) -> K,
 {
-    sorter::tilesort_impl_with_key(data, key_fn, false);
+    sorter::tilesort_impl_with_key_inplace(data, key_fn, false);
 }
 
 /// Sort a slice in descending order using a custom key extraction function.
@@ -109,7 +105,7 @@ where
     K: Ord + Clone,
     F: Fn(&T) -> K,
 {
-    sorter::tilesort_impl_with_key(data, key_fn, true);
+    sorter::tilesort_impl_with_key_inplace(data, key_fn, true);
 }
 
 /// Return a sorted copy using a custom key extraction function.
@@ -128,9 +124,7 @@ where
     K: Ord + Clone,
     F: Fn(&T) -> K,
 {
-    let mut result = data.to_vec();
-    sorter::tilesort_impl_with_key(&mut result, key_fn, false);
-    result
+    sorter::tilesort_copy_with_key(data, key_fn, false)
 }
 
 /// Return a sorted copy in descending order using a custom key extraction function.
@@ -149,9 +143,7 @@ where
     K: Ord + Clone,
     F: Fn(&T) -> K,
 {
-    let mut result = data.to_vec();
-    sorter::tilesort_impl_with_key(&mut result, key_fn, true);
-    result
+    sorter::tilesort_copy_with_key(data, key_fn, true)
 }
 
 // Python bindings (only when 'python' feature is enabled)
@@ -161,7 +153,7 @@ mod python_bindings {
     use pyo3::types::{PyAny, PyList};
 
     use crate::key_extractor::KeyExtractor;
-    use crate::sorter::{tilesort_impl, tilesort_impl_with_key};
+    use crate::sorter::{tilesort_impl_inplace, tilesort_impl_with_key_inplace};
     use std::cmp::Ordering;
 
     /// Wrapper around PyObject that implements Ord using Python's comparison protocol
@@ -256,12 +248,13 @@ mod python_bindings {
             let mut items: Vec<PyOrd> = list.iter().map(|item| PyOrd::new(item.into())).collect();
 
             // Sort based on whether we have a key function
+            // Use inplace version since we've already cloned from Python list
             if let Some(key_fn) = key {
                 let extractor = PyKeyExtractor { key_fn };
-                tilesort_impl_with_key(&mut items, extractor, reverse);
+                tilesort_impl_with_key_inplace(&mut items, extractor, reverse);
             } else {
                 // Use Python's natural ordering via __lt__
-                tilesort_impl(&mut items, reverse);
+                tilesort_impl_inplace(&mut items, reverse);
             }
 
             // Clear the original list and repopulate it
@@ -293,12 +286,13 @@ mod python_bindings {
             let mut items: Vec<PyOrd> = list.iter().map(|item| PyOrd::new(item.into())).collect();
 
             // Sort based on whether we have a key function
+            // Use inplace version since we've already cloned from Python list
             if let Some(key_fn) = key {
                 let extractor = PyKeyExtractor { key_fn };
-                tilesort_impl_with_key(&mut items, extractor, reverse);
+                tilesort_impl_with_key_inplace(&mut items, extractor, reverse);
             } else {
                 // Use Python's natural ordering via __lt__
-                tilesort_impl(&mut items, reverse);
+                tilesort_impl_inplace(&mut items, reverse);
             }
 
             // Create a new Python list with sorted items

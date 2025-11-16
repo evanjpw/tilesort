@@ -29,15 +29,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-#readme = "README.md"
-#license = { text = "MIT OR Apache-2.0" }
-#keywords = ["sorting", "algorithm", "optimization", "performance"]
 dynamic = ["version",   "license",   "readme",    "keywords"]
 # TODO: add:
 #dynamic = [
 #    "description",
-#    "urls",
 #    "authors",
+#    "urls",
 #]
 
 [project.urls]
@@ -45,6 +42,7 @@ Homepage = "https://github.com/evanjpw/tilesort"
 Repository = "https://github.com/evanjpw/tilesort"
 # TODO: Add real documentation
 Documentation = "https://github.com/evanjpw/tilesort#readme"
+Issues = "https://github.com/evanjpw/tilesort/issues"
 
 [tool.maturin]
 features = ["pyo3/extension-module", "python"]

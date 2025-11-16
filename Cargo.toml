@@ -1,6 +1,6 @@
 [package]
 name = "tilesort"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.71.1"
 authors = ["Evan Williams <evanjpw@gmail.com>"]
@@ -10,6 +10,10 @@ repository = "https://github.com/evanjpw/tilesort"
 license = "MIT OR Apache-2.0"
 keywords = ["sorting", "algorithm", "optimization", "performance"]
 categories = ["algorithms"]
+homepage = "https://github.com/evanjpw/tilesort"
+# TODO: Is this needed?
+#documentation = "https://docs.rs/tilesort/latest/tilesort/"
+
 
 [lib]
 name = "tilesort"

@@ -69,7 +69,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tilesort = "0.1.0"
+tilesort = "0.2.0"
 ```
 
 ## Usage
